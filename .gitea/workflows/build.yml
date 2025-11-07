@@ -26,11 +26,23 @@ jobs:
           
           docker buildx create --name insecure-builder --config ./buildkitd.toml --driver-opt network=host --use --bootstrap
       
+      - name: Create Docker config for auth
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p ~/.docker
+          cat > ~/.docker/config.json << EOF
+          {
+            "auths": {
+              "10.0.6.48:3000": {
+                "auth": "$(echo -n "${{ secrets.giteausername }}:${{ secrets.giteapassword }}" | base64)"
+              }
+            }
+          }
+          EOF
+      
       - name: Build and push Docker image with buildx
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ secrets.giteapassword }}" | docker login 10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin
-          
           docker buildx build \
             -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
             -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} \
