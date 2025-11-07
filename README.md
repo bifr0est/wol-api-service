@@ -6,7 +6,7 @@ A containerized REST API service that sends Wake-on-LAN (WOL) magic packets to w
 
 - 🚀 Simple REST API for sending WOL packets
 - 🐳 Fully containerized with Docker
-- 🔧 Configurable broadcast IP and port
+- 🔧 Configurable broadcast IP, port, and service port
 - 📝 JSON-based request/response
 - ❤️ Health check endpoint
 
@@ -21,8 +21,10 @@ docker-compose up -d --build
 
 2. Check if the service is running:
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:5001/health
 ```
+
+> **Note:** The default service port is 5001. You can change it by setting the `PORT` environment variable in `docker-compose.yml`.
 
 ### Using Docker
 
@@ -33,10 +35,10 @@ docker build -t wol-api-service .
 
 2. Run the container:
 ```bash
-docker run -d -p 5000:5000 --network host --name wol-api-service wol-api-service
+docker run -d --network host -e PORT=5001 --name wol-api-service wol-api-service
 ```
 
-> **Note:** The `--network host` flag is required for the container to send broadcast packets on your local network.
+> **Note:** The `--network host` flag is required for the container to send broadcast packets on your local network. When using host networking, the `-p` port mapping flag is not needed.
 
 ## API Usage
 
@@ -45,7 +47,7 @@ docker run -d -p 5000:5000 --network host --name wol-api-service wol-api-service
 Check if the service is running:
 
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:5001/health
 ```
 
 Response:
@@ -60,7 +62,7 @@ Response:
 Send a POST request with the MAC address of the device you want to wake:
 
 ```bash
-curl -X POST http://localhost:5000/wake \
+curl -X POST http://localhost:5001/wake \
   -H "Content-Type: application/json" \
   -d '{
     "mac_address": "AA:BB:CC:DD:EE:FF"
@@ -76,7 +78,7 @@ curl -X POST http://localhost:5000/wake \
 **Example with custom broadcast IP:**
 
 ```bash
-curl -X POST http://localhost:5000/wake \
+curl -X POST http://localhost:5001/wake \
   -H "Content-Type: application/json" \
   -d '{
     "mac_address": "AA:BB:CC:DD:EE:FF",
@@ -131,13 +133,30 @@ docker-compose logs -f
 docker-compose restart
 ```
 
-## Network Configuration
+## Configuration
+
+### Service Port
+
+The API service port can be configured via the `PORT` environment variable (default: 5001).
+
+**In docker-compose.yml:**
+```yaml
+environment:
+  - PORT=8080  # Use any available port
+```
+
+**With Docker run:**
+```bash
+docker run -d --network host -e PORT=8080 --name wol-api-service wol-api-service
+```
+
+### Network Configuration
 
 The container uses `network_mode: host` to access the host's network directly, which is necessary for broadcasting WOL packets. This means:
 
-- The service will be accessible on the host's IP at port 5000
+- The service will be accessible on the host's IP at the configured port (default: 5001)
 - The container can send broadcast packets on the local network
-- Port mapping is handled by the host network
+- Port mapping (`-p` flag) is not used with host networking
 
 If you need to use a specific broadcast address for a subnet, include it in your API requests.
 

@@ -4,9 +4,8 @@ services:
   wol-api:
     build: .
     container_name: wol-api-service
-    ports:
-      - "5000:5000"
     network_mode: "host"  # Required for broadcasting WOL packets
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - PORT=5001
