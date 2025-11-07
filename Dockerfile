@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-LABEL org.opencontainers.image.source="https://10.0.6.48:3000/bifroest/wol-api-service"
+LABEL org.opencontainers.image.source="https://github.com/bifroest/wol-api-service"
 LABEL org.opencontainers.image.description="Wake-on-LAN API Service"
 LABEL org.opencontainers.image.licenses="MIT"
 
