@@ -16,28 +16,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          config-inline: |
-            [registry."10.0.6.48:3000"]
-              http = true
-              insecure = true
-      
-      - name: Login to Gitea Container Registry
+      - name: Build Docker image
         run: |
-          echo "${{ secrets.giteapassword }}" | docker login 10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin
+          docker build -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
+                       -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} .
       
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            10.0.6.48:3000/bifroest/wol-api-service:latest
-            10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }}
-          cache-from: type=registry,ref=10.0.6.48:3000/bifroest/wol-api-service:latest
-          cache-to: type=inline
+      - name: Login and push to Gitea Container Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.giteapassword }}" | docker login http://10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin
+          docker push 10.0.6.48:3000/bifroest/wol-api-service:latest
+          docker push 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }}
       
       - name: Display success message
         if: success()
