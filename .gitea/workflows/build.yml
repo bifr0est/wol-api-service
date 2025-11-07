@@ -24,25 +24,24 @@ jobs:
             insecure = true
           EOF
           
-          docker buildx create --name insecure-builder --config ./buildkitd.toml --use --bootstrap
-      
-      - name: Login to registry (for buildx)
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "${{ secrets.giteapassword }}" | docker login 10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin || true
+          docker buildx create --name insecure-builder --config ./buildkitd.toml --driver-opt network=host --use --bootstrap
       
       - name: Build and push Docker image with buildx
+        if: github.event_name != 'pull_request'
         run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            docker buildx build \
-              -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
-              -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} \
-              --push .
-          else
-            docker buildx build \
-              -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
-              .
-          fi
+          echo "${{ secrets.giteapassword }}" | docker login 10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin
+          
+          docker buildx build \
+            -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
+            -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} \
+            --push .
+      
+      - name: Build only (for PRs)
+        if: github.event_name == 'pull_request'
+        run: |
+          docker buildx build \
+            -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
+            .
       
       - name: Display success message
         if: success()
