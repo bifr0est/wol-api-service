@@ -2,6 +2,9 @@ pipeline {
     agent any
     
     environment {
+        DOCKER_HOST = 'tcp://10.0.4.55:2376'
+        DOCKER_TLS_VERIFY = '1'
+        DOCKER_CERT_PATH = '/var/jenkins_home/docker-certs'
         DOCKER_REGISTRY = '10.0.6.48:3000'  // Gitea registry
         IMAGE_NAME = 'wol-api-service'
         DOCKER_CREDENTIALS_ID = 'gitea-docker-registry'  // You'll need to add this in Jenkins
