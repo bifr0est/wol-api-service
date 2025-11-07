@@ -1,14 +1,15 @@
 # Wake-on-LAN API Service
 
-A containerized REST API service that sends Wake-on-LAN (WOL) magic packets to wake up devices on your network.
+A simple containerized HTTP service that sends Wake-on-LAN (WOL) magic packets to wake up devices on your network.
 
 ## Features
 
-- 🚀 Simple REST API for sending WOL packets
+- 🚀 Simple HTTP API for sending WOL packets
 - 🐳 Fully containerized with Docker
-- 🔧 Configurable broadcast IP, port, and service port
-- 📝 JSON-based request/response
+- 🔧 Configurable broadcast IP, UDP port, and service port
+- 🌐 Web interface included
 - ❤️ Health check endpoint
+- 📦 Zero external dependencies - pure Python stdlib
 
 ## Quick Start
 
@@ -55,6 +56,8 @@ docker-compose up -d --build
 curl http://localhost:5001/health
 ```
 
+You can also open http://localhost:5001 in your browser to use the web interface.
+
 > **Note:** The default service port is 5001. You can change it by setting the `PORT` environment variable in `docker-compose.yml`.
 
 #### Using Docker
@@ -73,6 +76,13 @@ docker run -d --network host -e PORT=5001 --name wol-api-service wol-api-service
 
 ## API Usage
 
+### Web Interface
+
+Open http://localhost:5001 in your browser to access the simple web form where you can enter:
+- MAC address
+- Broadcast IP (optional)
+- UDP port (optional)
+
 ### Health Check
 
 Check if the service is running:
@@ -82,61 +92,49 @@ curl http://localhost:5001/health
 ```
 
 Response:
-```json
-{
-  "status": "healthy"
-}
+```
+OK
 ```
 
-### Send Wake-on-LAN Packet
+### Send Wake-on-LAN Packet via URL
 
-Send a POST request with the MAC address of the device you want to wake:
+Send a simple GET request with the MAC address as a URL parameter:
 
 ```bash
-curl -X POST http://localhost:5001/wake \
-  -H "Content-Type: application/json" \
-  -d '{
-    "mac_address": "AA:BB:CC:DD:EE:FF"
-  }'
+curl "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF"
 ```
 
-**Request Body Parameters:**
+**URL Parameters:**
 
-- `mac_address` (required): MAC address in format `XX:XX:XX:XX:XX:XX` or `XX-XX-XX-XX-XX-XX`
-- `broadcast_ip` (optional): Broadcast IP address (default: `255.255.255.255`)
-- `port` (optional): UDP port to send the packet to (default: `9`)
+- `mac` (required): MAC address in format `XX:XX:XX:XX:XX:XX` or `XX-XX-XX-XX-XX-XX`
+- `broadcast` (optional): Broadcast IP address (default: `255.255.255.255`)
+- `port` (optional): UDP port to send the WOL packet to (default: `9`)
 
-**Example with custom broadcast IP:**
+**Example with custom broadcast IP and port:**
 
 ```bash
-curl -X POST http://localhost:5001/wake \
-  -H "Content-Type: application/json" \
-  -d '{
-    "mac_address": "AA:BB:CC:DD:EE:FF",
-    "broadcast_ip": "192.168.1.255",
-    "port": 9
-  }'
+curl "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF&broadcast=192.168.1.255&port=7"
 ```
 
 **Success Response:**
 
-```json
-{
-  "status": "success",
-  "message": "Wake-on-LAN packet sent to AA:BB:CC:DD:EE:FF",
-  "mac_address": "AA:BB:CC:DD:EE:FF",
-  "broadcast_ip": "255.255.255.255",
-  "port": 9
-}
+```
+OK - WOL packet sent to AA:BB:CC:DD:EE:FF
 ```
 
 **Error Response:**
 
-```json
-{
-  "error": "mac_address is required"
-}
 ```
+400 Bad Request - Missing 'mac' parameter
+```
+
+### Important: Understanding the Ports
+
+- **Service Port** (default: 5001): The HTTP port where this service runs
+- **UDP Port** (default: 9): The destination port for the WOL magic packet
+  - Port 9 is most common (discard protocol)
+  - Port 7 is also widely used (echo protocol)
+  - Some devices may require different ports
 
 ## Requirements for Wake-on-LAN to Work
 

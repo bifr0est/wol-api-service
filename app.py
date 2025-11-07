@@ -1,34 +1,26 @@
-from flask import Flask, request, jsonify
+#!/usr/bin/env python3
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import parse_qs, urlparse
 import socket
-import struct
 import logging
 import os
 
-app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
 def send_wake_on_lan(mac_address, broadcast_ip='255.255.255.255', port=9):
-    """
-    Send a Wake-on-LAN magic packet to the specified MAC address.
-    
-    Args:
-        mac_address: MAC address in format 'XX:XX:XX:XX:XX:XX' or 'XX-XX-XX-XX-XX-XX'
-        broadcast_ip: Broadcast IP address (default: 255.255.255.255)
-        port: Port to send the packet to (default: 9)
-    """
+    """Send a Wake-on-LAN magic packet to the specified MAC address."""
     # Remove common separators and validate
     mac_address = mac_address.replace(':', '').replace('-', '').upper()
     
     if len(mac_address) != 12:
-        raise ValueError(f"Invalid MAC address length: {mac_address}")
+        raise ValueError(f"Invalid MAC address length")
     
     try:
-        # Convert MAC address to bytes
         mac_bytes = bytes.fromhex(mac_address)
     except ValueError:
-        raise ValueError(f"Invalid MAC address format: {mac_address}")
+        raise ValueError(f"Invalid MAC address format")
     
     # Create the magic packet: 6 bytes of 0xFF followed by MAC address repeated 16 times
     magic_packet = b'\xFF' * 6 + mac_bytes * 16
@@ -38,59 +30,90 @@ def send_wake_on_lan(mac_address, broadcast_ip='255.255.255.255', port=9):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.sendto(magic_packet, (broadcast_ip, port))
     
-    logger.info(f"Wake-on-LAN packet sent to {mac_address} via {broadcast_ip}:{port}")
+    logger.info(f"WOL packet sent to {mac_address} via {broadcast_ip}:{port}")
 
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({'status': 'healthy'}), 200
-
-
-@app.route('/wake', methods=['POST'])
-def wake():
-    """
-    Wake a device using Wake-on-LAN.
+class WOLHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        """Override to use our logger"""
+        logger.info("%s - %s" % (self.client_address[0], format % args))
     
-    Expected JSON body:
-    {
-        "mac_address": "XX:XX:XX:XX:XX:XX",
-        "broadcast_ip": "255.255.255.255" (optional),
-        "port": 9 (optional)
-    }
-    """
-    try:
-        data = request.get_json()
+    def do_GET(self):
+        """Handle GET requests - health check and simple wake interface"""
+        parsed = urlparse(self.path)
         
-        if not data:
-            return jsonify({'error': 'No JSON data provided'}), 400
+        if parsed.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'OK')
+            return
         
-        mac_address = data.get('mac_address')
-        if not mac_address:
-            return jsonify({'error': 'mac_address is required'}), 400
+        if parsed.path == '/wake':
+            # Process wake request
+            self.do_wake()
+            return
         
-        broadcast_ip = data.get('broadcast_ip', '255.255.255.255')
-        port = data.get('port', 9)
-        
-        # Send the Wake-on-LAN packet
-        send_wake_on_lan(mac_address, broadcast_ip, port)
-        
-        return jsonify({
-            'status': 'success',
-            'message': f'Wake-on-LAN packet sent to {mac_address}',
-            'mac_address': mac_address,
-            'broadcast_ip': broadcast_ip,
-            'port': port
-        }), 200
-        
-    except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
+        # Simple HTML form for root path
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        html = '''<!DOCTYPE html>
+<html>
+<head><title>Wake-on-LAN Service</title></head>
+<body>
+<h1>Wake-on-LAN Service</h1>
+<form method="GET" action="/wake">
+    <label>MAC Address: <input type="text" name="mac" placeholder="AA:BB:CC:DD:EE:FF" required></label><br><br>
+    <label>Broadcast IP: <input type="text" name="broadcast" value="255.255.255.255"></label><br><br>
+    <label>Port: <input type="number" name="port" value="9"></label><br><br>
+    <button type="submit">Wake Device</button>
+</form>
+</body>
+</html>'''
+        self.wfile.write(html.encode())
+    
+    def do_POST(self):
+        """Handle POST requests - wake with query parameters"""
+        self.do_wake()
+    
+    def do_wake(self):
+        """Process wake request from GET or POST"""
+        try:
+            # Parse query string
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            
+            mac = params.get('mac', [None])[0]
+            if not mac:
+                self.send_error(400, "Missing 'mac' parameter")
+                return
+            
+            broadcast_ip = params.get('broadcast', ['255.255.255.255'])[0]
+            port = int(params.get('port', ['9'])[0])
+            
+            # Send WOL packet
+            send_wake_on_lan(mac, broadcast_ip, port)
+            
+            # Send success response
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(f'OK - WOL packet sent to {mac}'.encode())
+            
+        except ValueError as e:
+            self.send_error(400, str(e))
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            self.send_error(500, "Internal server error")
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    port = int(os.environ.get('PORT', 5001))
+    server = HTTPServer(('0.0.0.0', port), WOLHandler)
+    logger.info(f'Starting WOL service on port {port}...')
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info('Shutting down...')
+        server.shutdown()
