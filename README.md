@@ -12,7 +12,38 @@ A containerized REST API service that sends Wake-on-LAN (WOL) magic packets to w
 
 ## Quick Start
 
-### Using Docker Compose (Recommended)
+### Using Pre-built Image from GitHub Container Registry
+
+Pull and run the latest image:
+
+```bash
+docker run -d --network host -e PORT=5001 --name wol-api-service ghcr.io/bifr0est/wol-api-service:latest
+```
+
+Or with docker-compose, update the `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  wol-api:
+    image: ghcr.io/bifr0est/wol-api-service:latest
+    container_name: wol-api-service
+    network_mode: "host"
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=5001
+```
+
+Then run:
+```bash
+docker-compose up -d
+```
+
+### Building from Source
+
+#### Using Docker Compose (Recommended)
 
 1. Build and start the container:
 ```bash
@@ -26,7 +57,7 @@ curl http://localhost:5001/health
 
 > **Note:** The default service port is 5001. You can change it by setting the `PORT` environment variable in `docker-compose.yml`.
 
-### Using Docker
+#### Using Docker
 
 1. Build the image:
 ```bash
