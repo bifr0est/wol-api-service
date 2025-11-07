@@ -26,19 +26,23 @@ jobs:
           
           docker buildx create --name insecure-builder --config ./buildkitd.toml --use --bootstrap
       
-      - name: Build Docker image
-        run: |
-          docker buildx build \
-            -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
-            -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} \
-            --load .
-      
-      - name: Login and push to Gitea Container Registry
+      - name: Login to registry (for buildx)
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ secrets.giteapassword }}" | docker login 10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin
-          docker push 10.0.6.48:3000/bifroest/wol-api-service:latest
-          docker push 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }}
+          echo "${{ secrets.giteapassword }}" | docker login 10.0.6.48:3000 -u "${{ secrets.giteausername }}" --password-stdin || true
+      
+      - name: Build and push Docker image with buildx
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            docker buildx build \
+              -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
+              -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} \
+              --push .
+          else
+            docker buildx build \
+              -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
+              .
+          fi
       
       - name: Display success message
         if: success()
