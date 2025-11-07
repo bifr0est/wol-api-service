@@ -16,15 +16,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Configure insecure registry
+      - name: Set up buildx with insecure registry
         run: |
-          mkdir -p ~/.docker
-          echo '{"insecure-registries":["10.0.6.48:3000"]}' > ~/.docker/config.json
+          cat > buildkitd.toml << EOF
+          [registry."10.0.6.48:3000"]
+            http = true
+            insecure = true
+          EOF
+          
+          docker buildx create --name insecure-builder --config ./buildkitd.toml --use --bootstrap
       
       - name: Build Docker image
         run: |
-          docker build -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
-                       -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} .
+          docker buildx build \
+            -t 10.0.6.48:3000/bifroest/wol-api-service:latest \
+            -t 10.0.6.48:3000/bifroest/wol-api-service:${{ github.sha }} \
+            --load .
       
       - name: Login and push to Gitea Container Registry
         if: github.event_name != 'pull_request'
