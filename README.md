@@ -10,6 +10,10 @@ A simple containerized HTTP service that sends Wake-on-LAN (WOL) magic packets t
 - 🌐 Web interface included
 - ❤️ Health check endpoint
 - 📦 Zero external dependencies - pure Python stdlib
+- 🔒 Optional API key authentication
+- 🌍 Optional CORS support for web frontends
+- ⚡ Built-in rate limiting to prevent abuse
+- 🐍 Python 3.13 with full type hints
 
 ## Quick Start
 
@@ -24,8 +28,6 @@ docker run -d --network host -e PORT=5001 --name wol-api-service ghcr.io/bifr0es
 Or with docker-compose, update the `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   wol-api:
     image: ghcr.io/bifr0est/wol-api-service:latest
@@ -164,6 +166,18 @@ docker-compose restart
 
 ## Configuration
 
+### Environment Variables
+
+The service can be configured using the following environment variables:
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `PORT` | HTTP service port | `5001` | `8080` |
+| `API_KEY` | Optional API key for authentication | (none) | `your-secret-key-123` |
+| `ENABLE_CORS` | Enable CORS headers for web frontends | `false` | `true` |
+| `RATE_LIMIT_REQUESTS` | Max requests per time window | `10` | `20` |
+| `RATE_LIMIT_WINDOW` | Rate limit time window in seconds | `60` | `120` |
+
 ### Service Port
 
 The API service port can be configured via the `PORT` environment variable (default: 5001).
@@ -172,12 +186,52 @@ The API service port can be configured via the `PORT` environment variable (defa
 ```yaml
 environment:
   - PORT=8080  # Use any available port
+  - API_KEY=my-secret-key-123  # Enable authentication
+  - ENABLE_CORS=true  # Enable CORS
+  - RATE_LIMIT_REQUESTS=20  # Allow 20 requests
+  - RATE_LIMIT_WINDOW=60  # Per 60 seconds
 ```
 
 **With Docker run:**
 ```bash
-docker run -d --network host -e PORT=8080 --name wol-api-service wol-api-service
+docker run -d --network host \
+  -e PORT=8080 \
+  -e API_KEY=my-secret-key-123 \
+  -e ENABLE_CORS=true \
+  --name wol-api-service wol-api-service
 ```
+
+### Authentication
+
+When `API_KEY` is set, the service requires authentication for all `/wake` requests (but not `/health`).
+
+**Option 1: Authorization header (recommended)**
+```bash
+curl -H "Authorization: Bearer your-secret-key-123" \
+  "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF"
+```
+
+**Option 2: Query parameter**
+```bash
+curl "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF&api_key=your-secret-key-123"
+```
+
+### Rate Limiting
+
+Rate limiting is enabled by default to prevent abuse:
+- Default: 10 requests per 60 seconds per IP address
+- Configurable via `RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW`
+- Returns `429 Too Many Requests` when exceeded
+
+### CORS Support
+
+Enable CORS for cross-origin requests from web frontends:
+```yaml
+environment:
+  - ENABLE_CORS=true
+```
+
+This allows JavaScript applications on different domains to call the API.
 
 ### Network Configuration
 
@@ -203,8 +257,13 @@ If you need to use a specific broadcast address for a subnet, include it in your
 
 **API returns errors:**
 - Check the logs: `docker-compose logs -f`
-- Verify the JSON format in your request
-- Ensure the MAC address format is valid
+- Verify the MAC address format is valid
+- If authentication is enabled, ensure API key is correct
+- Check if rate limit is exceeded (wait or adjust limits)
+
+**CORS errors in browser:**
+- Set `ENABLE_CORS=true` in environment variables
+- Restart the container after configuration changes
 
 ## License
 

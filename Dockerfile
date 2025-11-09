@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 LABEL org.opencontainers.image.source="https://github.com/bifr0est/wol-api-service"
 LABEL org.opencontainers.image.description="Wake-on-LAN API Service"
@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 
 # Expose the port the app runs on
-EXPOSE 5000
+EXPOSE 5001
 
 # Run the application
 CMD ["python", "app.py"]
