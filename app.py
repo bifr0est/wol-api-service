@@ -2,6 +2,7 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 import socket
+import struct
 import logging
 import os
 import ipaddress
@@ -53,33 +54,29 @@ def check_rate_limit(ip: str) -> bool:
 
 def send_wake_on_lan(mac_address: str, broadcast_ip: str = '255.255.255.255', port: int = 9) -> None:
     """Send a Wake-on-LAN magic packet to the specified MAC address."""
-    # Remove common separators and validate
-    mac_address = mac_address.replace(':', '').replace('-', '').upper()
+    # Remove common separators for validation
+    mac_clean = mac_address.replace(':', '').replace('-', '')
     
-    if len(mac_address) != 12:
+    if len(mac_clean) != 12:
         raise ValueError(f"Invalid MAC address length")
     
+    # Use struct.pack like the working implementation
+    # Split MAC into bytes and pack them
     try:
-        mac_bytes = bytes.fromhex(mac_address)
+        packed_mac = struct.pack('!6B', *[int(mac_clean[i:i+2], 16) for i in range(0, 12, 2)])
     except ValueError:
         raise ValueError(f"Invalid MAC address format")
     
     # Create the magic packet: 6 bytes of 0xFF followed by MAC address repeated 16 times
-    magic_packet = b'\xFF' * 6 + mac_bytes * 16
+    magic_packet = b'\xff' * 6 + packed_mac * 16
     
-    # Send the packet via UDP broadcast
-    # Use '<broadcast>' as special address to ensure proper broadcast behavior
+    # Send the packet via UDP broadcast - exactly like working implementation
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    
-    # Send to both the specified broadcast and the generic broadcast for reliability
     sock.sendto(magic_packet, ('<broadcast>', port))
-    if broadcast_ip != '255.255.255.255':
-        sock.sendto(magic_packet, (broadcast_ip, port))
-    
     sock.close()
     
-    logger.info(f"WOL packet sent to {mac_address} via <broadcast> and {broadcast_ip}:{port}")
+    logger.info(f"WOL packet sent to {mac_address.upper()} via <broadcast>:{port}")
 
 
 class WOLHandler(BaseHTTPRequestHandler):
