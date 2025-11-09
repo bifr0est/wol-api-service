@@ -185,14 +185,20 @@ class WOLHandler(BaseHTTPRequestHandler):
             content_type = self.headers.get('Content-Type', '')
             params = {}
             
+            logger.info(f"POST request - Content-Type: {content_type}")
+            
             if 'application/json' in content_type:
                 content_length = int(self.headers.get('Content-Length', 0))
+                logger.info(f"Content-Length: {content_length}")
                 if content_length > 0:
                     body = self.rfile.read(content_length)
+                    logger.info(f"Raw body: {body.decode('utf-8')}")
                     try:
                         data = json.loads(body.decode('utf-8'))
+                        logger.info(f"Parsed JSON: {data}")
                         params = {k: [v] if not isinstance(v, list) else v for k, v in data.items()}
                     except json.JSONDecodeError as e:
+                        logger.error(f"JSON decode error: {e}")
                         self.send_response(400)
                         self.send_header('Content-type', 'text/plain')
                         self.send_cors_headers()
@@ -210,6 +216,8 @@ class WOLHandler(BaseHTTPRequestHandler):
                 parsed = urlparse(self.path)
                 params = parse_qs(parsed.query)
             
+            logger.info(f"Final params: {params}")
+            
             # Process the wake request with extracted params
             self.process_wake_request(params)
             
@@ -226,12 +234,15 @@ class WOLHandler(BaseHTTPRequestHandler):
         try:
             # Support both 'mac' and 'mac_address' for compatibility
             mac = params.get('mac', [None])[0] or params.get('mac_address', [None])[0]
+            logger.info(f"Extracted MAC: {mac}")
             if not mac:
+                error_msg = f"Missing 'mac' or 'mac_address' parameter. Received params: {params}"
+                logger.error(error_msg)
                 self.send_response(400)
                 self.send_header('Content-type', 'text/plain')
                 self.send_cors_headers()
                 self.end_headers()
-                self.wfile.write(b"Missing 'mac' or 'mac_address' parameter")
+                self.wfile.write(error_msg.encode())
                 return
             
             # Support both 'broadcast' and 'broadcast_ip' for compatibility
