@@ -118,6 +118,30 @@ curl "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF"
 curl "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF&broadcast=192.168.1.255&port=7"
 ```
 
+### Send Wake-on-LAN via POST Request
+
+**Option 1: JSON Body (recommended for programmatic use)**
+
+```bash
+curl -X POST http://localhost:5001/wake \
+  -H "Content-Type: application/json" \
+  -d '{"mac": "AA:BB:CC:DD:EE:FF", "broadcast": "255.255.255.255", "port": 9}'
+```
+
+**Option 2: Form Data**
+
+```bash
+curl -X POST http://localhost:5001/wake \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "mac=AA:BB:CC:DD:EE:FF&broadcast=255.255.255.255&port=9"
+```
+
+**Option 3: Query Parameters (also works with POST)**
+
+```bash
+curl -X POST "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF"
+```
+
 **Success Response:**
 
 ```

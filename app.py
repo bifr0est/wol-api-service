@@ -6,6 +6,7 @@ import logging
 import os
 import ipaddress
 import time
+import json
 from collections import defaultdict
 from typing import Optional
 
@@ -157,13 +158,9 @@ class WOLHandler(BaseHTTPRequestHandler):
         self.wfile.write(html.encode())
     
     def do_POST(self) -> None:
-        """Handle POST requests - wake with query parameters"""
-        self.do_wake()
-    
-    def do_wake(self) -> None:
-        """Process wake request from GET or POST"""
+        """Handle POST requests - supports JSON body, form data, and query parameters"""
         try:
-            # Check authentication
+            # Check authentication first
             if not self.check_authentication():
                 self.send_response(401)
                 self.send_header('Content-type', 'text/plain')
@@ -184,10 +181,49 @@ class WOLHandler(BaseHTTPRequestHandler):
                 logger.warning(f"Rate limit exceeded for {client_ip}")
                 return
             
-            # Parse query string
-            parsed = urlparse(self.path)
-            params = parse_qs(parsed.query)
+            # Try to parse JSON body first
+            content_type = self.headers.get('Content-Type', '')
+            params = {}
             
+            if 'application/json' in content_type:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    body = self.rfile.read(content_length)
+                    try:
+                        data = json.loads(body.decode('utf-8'))
+                        params = {k: [v] if not isinstance(v, list) else v for k, v in data.items()}
+                    except json.JSONDecodeError as e:
+                        self.send_response(400)
+                        self.send_header('Content-type', 'text/plain')
+                        self.send_cors_headers()
+                        self.end_headers()
+                        self.wfile.write(f'Invalid JSON: {str(e)}'.encode())
+                        return
+            elif 'application/x-www-form-urlencoded' in content_type:
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    body = self.rfile.read(content_length).decode('utf-8')
+                    params = parse_qs(body)
+            
+            # Fallback to query parameters if no body
+            if not params:
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+            
+            # Process the wake request with extracted params
+            self.process_wake_request(params)
+            
+        except Exception as e:
+            logger.error(f"Error in POST: {e}")
+            self.send_response(500)
+            self.send_header('Content-type', 'text/plain')
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(b"Internal server error")
+    
+    def process_wake_request(self, params: dict) -> None:
+        """Process wake request with given parameters."""
+        try:
             mac = params.get('mac', [None])[0]
             if not mac:
                 self.send_response(400)
@@ -235,6 +271,46 @@ class WOLHandler(BaseHTTPRequestHandler):
             self.send_cors_headers()
             self.end_headers()
             self.wfile.write(b"Internal server error")
+    
+    def do_wake(self) -> None:
+        """Process wake request from GET"""
+        try:
+            # Check authentication
+            if not self.check_authentication():
+                self.send_response(401)
+                self.send_header('Content-type', 'text/plain')
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(b'Unauthorized - Invalid or missing API key')
+                logger.warning(f"Unauthorized access attempt from {self.client_address[0]}")
+                return
+            
+            # Check rate limit
+            client_ip = self.client_address[0]
+            if not check_rate_limit(client_ip):
+                self.send_response(429)
+                self.send_header('Content-type', 'text/plain')
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(f'Rate limit exceeded - Max {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds'.encode())
+                logger.warning(f"Rate limit exceeded for {client_ip}")
+                return
+            
+            # Parse query string
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            
+            # Use the shared processing method
+            self.process_wake_request(params)
+            
+        except Exception as e:
+            logger.error(f"Error in GET: {e}")
+            self.send_response(500)
+            self.send_header('Content-type', 'text/plain')
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(b"Internal server error")
+
 
 
 if __name__ == '__main__':
