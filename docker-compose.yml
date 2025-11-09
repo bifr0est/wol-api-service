@@ -6,4 +6,4 @@ services:
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
-      - PORT=5001
+      - PORT=9200

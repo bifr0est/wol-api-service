@@ -73,7 +73,20 @@ def send_wake_on_lan(mac_address: str, broadcast_ip: str = '255.255.255.255', po
     # Send the packet via UDP broadcast - exactly like working implementation
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    
+    # Log packet details for debugging
+    logger.info(f"Magic packet length: {len(magic_packet)} bytes")
+    logger.info(f"Magic packet (hex): {magic_packet[:18].hex()}...") # First 18 bytes
+    
     sock.sendto(magic_packet, ('<broadcast>', port))
+    
+    # Get local address to see which interface was used
+    try:
+        local_addr = sock.getsockname()
+        logger.info(f"Sent from local address: {local_addr}")
+    except:
+        pass
+    
     sock.close()
     
     logger.info(f"WOL packet sent to {mac_address.upper()} via <broadcast>:{port}")
