@@ -128,6 +128,11 @@ curl -X POST http://localhost:5001/wake \
   -d '{"mac": "AA:BB:CC:DD:EE:FF", "broadcast": "255.255.255.255", "port": 9}'
 ```
 
+**JSON Field Names:**
+- `mac` or `mac_address` (required): MAC address
+- `broadcast` or `broadcast_ip` (optional): Broadcast IP address (default: `255.255.255.255`)
+- `port` (optional): UDP port (default: `9`)
+
 **Option 2: Form Data**
 
 ```bash
@@ -140,6 +145,45 @@ curl -X POST http://localhost:5001/wake \
 
 ```bash
 curl -X POST "http://localhost:5001/wake?mac=AA:BB:CC:DD:EE:FF"
+```
+
+### Home Assistant Integration
+
+Add this to your `configuration.yaml`:
+
+```yaml
+rest_command:
+  wake_computer:
+    url: "http://YOUR_SERVER_IP:5001/wake"
+    method: POST
+    headers:
+      content-type: "application/json"
+    payload: >
+      {
+        "mac_address": "AA:BB:CC:DD:EE:FF",
+        "broadcast_ip": "192.168.1.255",
+        "port": 9
+      }
+```
+
+Then call it with:
+```yaml
+service: rest_command.wake_computer
+```
+
+If you have API key authentication enabled, add the header:
+```yaml
+rest_command:
+  wake_computer:
+    url: "http://YOUR_SERVER_IP:5001/wake"
+    method: POST
+    headers:
+      content-type: "application/json"
+      authorization: "Bearer your-secret-key-123"
+    payload: >
+      {
+        "mac_address": "AA:BB:CC:DD:EE:FF"
+      }
 ```
 
 **Success Response:**

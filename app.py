@@ -224,16 +224,18 @@ class WOLHandler(BaseHTTPRequestHandler):
     def process_wake_request(self, params: dict) -> None:
         """Process wake request with given parameters."""
         try:
-            mac = params.get('mac', [None])[0]
+            # Support both 'mac' and 'mac_address' for compatibility
+            mac = params.get('mac', [None])[0] or params.get('mac_address', [None])[0]
             if not mac:
                 self.send_response(400)
                 self.send_header('Content-type', 'text/plain')
                 self.send_cors_headers()
                 self.end_headers()
-                self.wfile.write(b"Missing 'mac' parameter")
+                self.wfile.write(b"Missing 'mac' or 'mac_address' parameter")
                 return
             
-            broadcast_ip = params.get('broadcast', ['255.255.255.255'])[0]
+            # Support both 'broadcast' and 'broadcast_ip' for compatibility
+            broadcast_ip = params.get('broadcast', [None])[0] or params.get('broadcast_ip', [None])[0] or '255.255.255.255'
             
             # Validate and parse port with error handling
             try:
