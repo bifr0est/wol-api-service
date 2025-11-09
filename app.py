@@ -53,10 +53,6 @@ def check_rate_limit(ip: str) -> bool:
 
 def send_wake_on_lan(mac_address: str, broadcast_ip: str = '255.255.255.255', port: int = 9) -> None:
     """Send a Wake-on-LAN magic packet to the specified MAC address."""
-    # Validate broadcast IP
-    if not validate_ip_address(broadcast_ip):
-        raise ValueError(f"Invalid broadcast IP address: {broadcast_ip}")
-    
     # Remove common separators and validate
     mac_address = mac_address.replace(':', '').replace('-', '').upper()
     
@@ -72,11 +68,18 @@ def send_wake_on_lan(mac_address: str, broadcast_ip: str = '255.255.255.255', po
     magic_packet = b'\xFF' * 6 + mac_bytes * 16
     
     # Send the packet via UDP broadcast
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    # Use '<broadcast>' as special address to ensure proper broadcast behavior
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    
+    # Send to both the specified broadcast and the generic broadcast for reliability
+    sock.sendto(magic_packet, ('<broadcast>', port))
+    if broadcast_ip != '255.255.255.255':
         sock.sendto(magic_packet, (broadcast_ip, port))
     
-    logger.info(f"WOL packet sent to {mac_address} via {broadcast_ip}:{port}")
+    sock.close()
+    
+    logger.info(f"WOL packet sent to {mac_address} via <broadcast> and {broadcast_ip}:{port}")
 
 
 class WOLHandler(BaseHTTPRequestHandler):
